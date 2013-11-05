@@ -137,3 +137,40 @@ else:
       metadata = node.readMetadata()
       metadata[key] = value
       node.writeMetadata(metadata)
+
+try:
+  from carbon.blueflood import Blueflood
+except ImportError, e:
+  pass
+else:
+  class BluefloodDatabase(TimeSeriesDatabase):
+    plugin_name = 'blueflood'
+
+    def __init__(self, settings):
+      self.settings = settings
+      bf_settings = settings['blueflood']
+
+      self.bf_tenant = bf_settings.get('BLUEFLOOD_TENANT_ID')
+      self.bf_password = bf_settings.get('BLUEFLOOD_API_KEY')
+
+      bf_host = bf_settings.get('BLUEFLOOD_HOST')
+      bf_in_port = bf_settings.get('BLUEFLOOD_INGESTION_PORT')
+      bf_out_port = bf_settings.get('BLUEFLOOD_QUERY_PORT')
+
+      self.bf_client = Blueflood(self.bf_tenant, self.bf_password, bf_host=bf_host,
+        ingestion_port=bf_in_port, query_port=bf_out_port)
+
+    def write(self, metric, datapoints):
+      self.bf_client.write(metric, datapoints)
+
+    def exists(self, metric):
+      self.bf_client.exists(metric)
+
+    def create(self, metric, **options):
+      self.bf_client.create(metric, **options)
+
+    def get_metadata(self, metric, key):
+      self.bf_client.get_metadata(metric, key)
+
+    def set_metadata(self, metric, key, value):
+      self.bf_client.set_metadata(metric, key, value)
