@@ -8,7 +8,7 @@ except ImportError:
     import json
 
 
-class Blueflood:
+class Blueflood(object):
     def __init__(self, tenantId, api_key, **options):
         self.tenant = 'graphite_demo'
 
@@ -68,7 +68,7 @@ class Blueflood:
         return self._writer.write_metadata(self.tenant, metric, key, value)
 
 
-class BluefloodWriter:
+class BluefloodWriter(object):
     def __init__(self, ingestion_base_url, flush_threshold_count,
                  flush_threshold_time):
         self._base_url = ingestion_base_url
@@ -139,7 +139,7 @@ class BluefloodWriter:
         return True
 
 
-class BluefloodReader:
+class BluefloodReader(object):
     def __init__(self, query_base_url):
         self._base_url = query_base_url
         self._POINTS_TO_FETCH = 1000  # BF max limit
