@@ -20,8 +20,10 @@ class Blueflood:
         self._blueflood_host = 'localhost'
         self._blueflood_ingestion_port = 19000
         self._blueflood_query_port = 20000
-        self._blueflood_flush_count = 100  # count of messages to hit before flush
-        self._blueflood_flush_interval = 30  # max time between successive flushes (seconds)
+        # count of messages to hit before flush
+        self._blueflood_flush_count = 100
+        # max time between successive flushes (seconds)
+        self._blueflood_flush_interval = 30
 
         for key, value in options.items():
             if key == 'bf_host' and value is not None:
@@ -48,7 +50,8 @@ class Blueflood:
         self.query_base_url = 'http://' + self._blueflood_host + ':' +\
             self._blueflood_query_port + '/' + self._api_version + '/'
 
-        self._writer = BluefloodWriter(self.ingestion_base_url, self._blueflood_flush_count,
+        self._writer = BluefloodWriter(self.ingestion_base_url,
+                                       self._blueflood_flush_count,
                                        self._blueflood_flush_interval)
         self._reader = BluefloodReader(self.query_base_url)
 
@@ -66,7 +69,8 @@ class Blueflood:
 
 
 class BluefloodWriter:
-    def __init__(self, ingestion_base_url, flush_threshold_count, flush_threshold_time):
+    def __init__(self, ingestion_base_url, flush_threshold_count,
+                 flush_threshold_time):
         self._base_url = ingestion_base_url
         self._buffer = []
         self._FLUSH_SIZE_MIN = flush_threshold_count
@@ -138,11 +142,13 @@ class BluefloodWriter:
 class BluefloodReader:
     def __init__(self, query_base_url):
         self._base_url = query_base_url
+        self._POINTS_TO_FETCH = 1000  # BF max limit
 
     def _get_metrics_query_url(self, tenantId, metricName, start, end, points):
         return self._base_url + tenantId\
             + '/experimental/views/metric_data/' + metricName\
-            + '?from=' + str(start) + '&to=' + str(end) + '&points=' + str(points)
+            + '?from=' + str(start) + '&to=' + str(end) + '&points='\
+            + str(points)
 
     def exists(self, tenant, metric):
         end = long(time.time() * 1000)
@@ -152,13 +158,26 @@ class BluefloodReader:
         try:
             r = requests.get(url)
             return (r.status_code == requests.codes.ok)
-        except Exception:
-            # raise
-            return True
+        except:
+            raise
+
+    # startTime and endTime has to be time since epoch in milli-seconds
+    def fetch(self, tenant, metric, startTime, endTime):
+        url = self._get_metrics_query_url(tenant, metric, startTime, endTime,
+                                          self._POINTS_TO_FETCH)
+        try:
+            r = requests.get(url)
+            return r.content
+        except:
+            raise
 
     def read_metadata(self, tenant, metric, key, value):
         #TODO: Needs implementation
-        return True
+        raise NotImplemented()
+
+    def get_metrics(self, tenant, query):
+        # TODO Needs implementation
+        raise NotImplemented()
 
 
 def main():
@@ -168,7 +187,8 @@ def main():
             '--out_port=<blueflood HTTP metrics query port>'
     parser = OptionParser(usage=usage)
     parser.add_option('--host', dest='host', help='Blueflood host')
-    parser.add_option('--in_port', dest='ingestion_port', help='HTTP ingestion port')
+    parser.add_option('--in_port', dest='ingestion_port',
+                      help='HTTP ingestion port')
     parser.add_option('--out_port', dest='query_port', help='HTTP query port')
 
     (options, args) = parser.parse_args()
