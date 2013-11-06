@@ -67,6 +67,12 @@ class Blueflood(object):
     def set_metadata(self, metric, key, value):
         return self._writer.write_metadata(self.tenant, metric, key, value)
 
+    def get_intervals(self, metric):
+        return self._reader.get_interval(self.tenant, metric)
+
+    def fetch(self, metric, start_time, end_time):
+        return self._reader.fetch(self.tenant, metric, start_time, end_time)
+
 
 class BluefloodWriter(object):
     def __init__(self, ingestion_base_url, flush_threshold_count,
@@ -157,17 +163,42 @@ class BluefloodReader(object):
 
         try:
             r = requests.get(url)
-            return (r.status_code == requests.codes.ok)
+            if r.status_code == requests.codes.ok:
+                metrics = json.loads(r.content)['values']
+                return len(metrics) > 0
+            else:
+                raise Exception('Invalid HTTP status code')
+        except:
+            raise
+
+    def get_intervals(self, tenant, metric):
+        end = long(time.time() * 1000)
+        start = 0  # 0 milliseconds since epoch
+        url = self._get_metrics_query_url(tenant, metric, start, end, 100)
+
+        try:
+            r = requests.get(url)
+            if r.status_code == requests.codes.ok:
+                body = json.loads(r.content)
+                metrics = body['values']
+                if len(metrics) > 0:
+                    start = metrics[0]['timestamp']
+                    end = metrics[len(metrics) - 1]['timestamp']
+                    return [(start, end)]
+                else:
+                    raise Exception('Metric doesn\'t exist in Blueflood')
+            else:
+                raise Exception('Invalid HTTP response code.')
         except:
             raise
 
     # startTime and endTime has to be time since epoch in milli-seconds
-    def fetch(self, tenant, metric, startTime, endTime):
-        url = self._get_metrics_query_url(tenant, metric, startTime, endTime,
-                                          self._POINTS_TO_FETCH)
+    def fetch(self, tenant, metric, start_time, end_time):
+        url = self._get_metrics_query_url(tenant, metric, start_time,
+                                          end_time, self._POINTS_TO_FETCH)
         try:
             r = requests.get(url)
-            return r.content
+            return json.loads(r.content)['values']
         except:
             raise
 
