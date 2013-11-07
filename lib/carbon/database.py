@@ -6,6 +6,9 @@ from os.path import join, exists, dirname
 from carbon.util import PluginRegistrar
 
 
+# Ugly global state
+whisper_available = False
+
 
 class TimeSeriesDatabase(object):
   "Abstract base class for Carbon database backends"
@@ -39,6 +42,7 @@ class TimeSeriesDatabase(object):
 # "native" plugins below
 try:
   import whisper
+  whisper_available = True
 except ImportError:
   pass
 else:
@@ -93,7 +97,6 @@ else:
                          " invalid key: " + key)
       path = self._get_filesystem_path(metric)
       return whisper.setAggregationMethod(path, value)
-
 
 
 try:
@@ -158,7 +161,13 @@ else:
       bf_out_port = bf_settings.get('BLUEFLOOD_QUERY_PORT')
 
       self.bf_client = Blueflood(self.bf_tenant, self.bf_password, bf_host=bf_host,
-        ingestion_port=bf_in_port, query_port=bf_out_port)
+                                 ingestion_port=bf_in_port, query_port=bf_out_port)
+
+      # FIX: BF currently doesn't support discovery. So let's use whisper for now.
+      # We create whisper files during metric "creation". But we don't really write
+      # metrics into those files.
+      if whisper:
+        self._whisper = WhisperDatabase(settings)
 
     def write(self, metric, datapoints):
       self.bf_client.write(metric, datapoints)
@@ -168,6 +177,7 @@ else:
 
     def create(self, metric, **options):
       self.bf_client.create(metric, **options)
+      self._whisper.create(metric, **options)
 
     def get_metadata(self, metric, key):
       self.bf_client.get_metadata(metric, key)
